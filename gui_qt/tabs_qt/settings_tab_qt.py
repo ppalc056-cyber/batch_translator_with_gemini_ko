@@ -182,34 +182,20 @@ class SettingsTabQt(QtWidgets.QWidget):
 
         self.api_keys_edit = QtWidgets.QPlainTextEdit()
         self.api_keys_edit.setPlaceholderText("API 키를 줄바꿈으로 구분하여 입력")
-        TooltipQt(self.api_keys_edit, "Gemini API 키를 줄바꿈으로 구분하여 입력합니다.\n여러 키를 사용하면 로터이션됩니다.")
-        self.use_vertex_check = QtWidgets.QCheckBox("Vertex AI 사용")
-        TooltipQt(self.use_vertex_check, "Google Cloud Vertex AI를 사용하여 API를 호출합니다.\n서비스 계정 JSON 파일이 필요합니다.")
-        self.sa_path_edit = QtWidgets.QLineEdit()
-        TooltipQt(self.sa_path_edit, "Vertex AI 서비스 계정 JSON 파일 경로입니다.")
-        sa_browse = QtWidgets.QPushButton("찾기")
-        TooltipQt(sa_browse, "서비스 계정 JSON 파일을 선택합니다.")
-        sa_browse.clicked.connect(self._browse_sa)
-        sa_row = QtWidgets.QHBoxLayout()
-        sa_row.addWidget(self.sa_path_edit)
-        sa_row.addWidget(sa_browse)
-        self.gcp_project_edit = QtWidgets.QLineEdit()
-        TooltipQt(self.gcp_project_edit, "GCP 프로젝트 ID를 입력합니다.")
-        self.gcp_location_edit = QtWidgets.QLineEdit()
-        TooltipQt(self.gcp_location_edit, "GCP 리전을 입력합니다 (예: us-central1).")
+        TooltipQt(self.api_keys_edit, "DeepSeek API 키를 줄바꿈으로 구분하여 입력합니다.\n여러 키를 입력해도 현재는 첫 번째 키를 사용합니다.")
+        self.api_base_url_edit = QtWidgets.QLineEdit()
+        self.api_base_url_edit.setPlaceholderText("https://api.deepseek.com")
+        TooltipQt(self.api_base_url_edit, "DeepSeek API URL을 입력합니다.\n루트 URL(https://api.deepseek.com) 또는 /chat/completions까지 포함한 URL 모두 허용됩니다.")
 
         # 모델 콤보 (editable) - 기본 후보 + 사용자 입력 유지
         self.model_name_combo = NoWheelComboBox()
         self.model_name_combo.setEditable(True)
         self.model_name_combo.setInsertPolicy(QtWidgets.QComboBox.NoInsert)
         self.model_name_combo.addItems([
-            "gemini-2.0-flash",
-            "gemini-2.0-pro",
-            "gemini-2.5-pro",
-            "gemini-3-pro-preview",
-            "gemini-3-flash-preview",
+            "deepseek-v4-flash",
+            "deepseek-v4-pro",
         ])
-        TooltipQt(self.model_name_combo, "번역에 사용할 Gemini 모델을 선택하거나 직접 입력합니다.")
+        TooltipQt(self.model_name_combo, "번역에 사용할 DeepSeek 모델을 선택하거나 직접 입력합니다.")
 
         self.model_refresh_btn = QtWidgets.QPushButton("모델 목록 새로고침")
         TooltipQt(self.model_refresh_btn, "API에서 사용 가능한 모델 목록을 불러옵니다.")
@@ -223,11 +209,8 @@ class SettingsTabQt(QtWidgets.QWidget):
         model_row.addWidget(self.model_refresh_btn)
         model_row.addWidget(self.model_progress)
 
+        api_form.addRow("API URL", self.api_base_url_edit)
         api_form.addRow("API 키 목록", self.api_keys_edit)
-        api_form.addRow("Vertex AI", self.use_vertex_check)
-        api_form.addRow("서비스 계정 JSON", self._wrap(sa_row))
-        api_form.addRow("GCP 프로젝트", self.gcp_project_edit)
-        api_form.addRow("GCP 위치", self.gcp_location_edit)
         api_form.addRow("모델 이름", self._wrap(model_row))
 
         # --- 생성 파라미터 ---
@@ -264,32 +247,17 @@ class SettingsTabQt(QtWidgets.QWidget):
         top_p_row.addWidget(self.top_p_slider)
         top_p_row.addWidget(self.top_p_label)
 
-        # Thinking Budget (-1 ~ 32000)
-        self.thinking_budget_slider = NoWheelSlider(QtCore.Qt.Horizontal)
-        self.thinking_budget_slider.setRange(-1, 32000)
-        self.thinking_budget_slider.setSingleStep(128)
-        self.thinking_budget_slider.setValue(-1)
-        TooltipQt(self.thinking_budget_slider, "Gemini 2.5 전용 파라미터입니다.\n복잡한 추론에 사용할 토큰 예산을 설정합니다.\n-1: 비활성화, 양수: 사고에 사용할 최대 토큰 수.\n값이 클수록 더 깊은 추론이 가능하지만 비용이 증가합니다.")
-        self.thinking_budget_label = QtWidgets.QLabel("-1 (비활성)")
-        self.thinking_budget_label.setMinimumWidth(80)
-        TooltipQt(self.thinking_budget_label, "현재 설정된 Thinking Budget 값입니다.")
-        self.thinking_budget_slider.valueChanged.connect(
-            lambda v: self.thinking_budget_label.setText(
-                "-1 (비활성)" if v == -1 else str(v)
-            )
-        )
-        budget_row = QtWidgets.QHBoxLayout()
-        budget_row.addWidget(self.thinking_budget_slider)
-        budget_row.addWidget(self.thinking_budget_label)
-
-        self.thinking_level_combo = NoWheelComboBox()
-        self.thinking_level_combo.addItems(["low", "high"])
-        TooltipQt(self.thinking_level_combo, "Gemini 3 전용 파라미터입니다.\n모델의 추론 깊이 수준을 설정합니다.\nminimal/low/medium/high (Flash는 4단계, Pro는 2단계).\n높을수록 더 신중하게 추론하지만 응답 시간이 길어집니다.")
+        self.reasoning_enabled_check = QtWidgets.QCheckBox("추론 사용")
+        self.reasoning_enabled_check.setChecked(True)
+        TooltipQt(self.reasoning_enabled_check, "DeepSeek Thinking 모드 on/off")
+        self.reasoning_effort_combo = NoWheelComboBox()
+        self.reasoning_effort_combo.addItems(["high", "max"])
+        TooltipQt(self.reasoning_effort_combo, "추론 강도(권장값: high/max).")
 
         gen_form.addRow("Temperature", self._wrap(temp_row))
         gen_form.addRow("Top P", self._wrap(top_p_row))
-        gen_form.addRow("Thinking Budget", self._wrap(budget_row))
-        gen_form.addRow("Thinking Level", self.thinking_level_combo)
+        gen_form.addRow("Reasoning On/Off", self.reasoning_enabled_check)
+        gen_form.addRow("Reasoning Effort", self.reasoning_effort_combo)
 
         # --- 파일/처리 설정 ---
         file_group = QtWidgets.QGroupBox("파일 / 처리")
@@ -429,9 +397,8 @@ class SettingsTabQt(QtWidgets.QWidget):
         self.status_signal.connect(self._on_status)
         self.completion_signal.connect(self._on_completion)
 
-        self.use_vertex_check.stateChanged.connect(self._on_vertex_toggle)
         self.model_name_combo.currentTextChanged.connect(self._on_model_changed)
-        self.model_name_combo.editTextChanged.connect(self._on_model_changed)
+        self.reasoning_enabled_check.stateChanged.connect(lambda _: self._on_model_changed(self.model_name_combo.currentText()))
         self.model_refresh_btn.clicked.connect(self._refresh_model_list)
             # Removed duplicate connection
 
@@ -458,9 +425,8 @@ class SettingsTabQt(QtWidgets.QWidget):
             self.output_edit.setText(file_path)
 
     def _browse_sa(self) -> None:
-        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self, "서비스 계정 JSON 선택")
-        if file_path:
-            self.sa_path_edit.setText(file_path)
+        # DeepSeek 전용 UI에서는 사용하지 않음.
+        return
 
     def _progress_cb(self, dto: TranslationJobProgressDTO) -> None:
         # 콜백은 이벤트 루프 스레드에서 호출되므로 직접 emit
@@ -532,11 +498,7 @@ class SettingsTabQt(QtWidgets.QWidget):
             self.api_keys_edit.setPlainText("\n".join(api_keys))
         elif isinstance(api_keys, str):
             self.api_keys_edit.setPlainText(api_keys)
-
-        self.use_vertex_check.setChecked(bool(cfg.get("use_vertex_ai", defaults.get("use_vertex_ai", False))))
-        self.sa_path_edit.setText(str(cfg.get("service_account_file_path") or ""))
-        self.gcp_project_edit.setText(str(cfg.get("gcp_project") or ""))
-        self.gcp_location_edit.setText(str(cfg.get("gcp_location") or ""))
+        self.api_base_url_edit.setText(str(cfg.get("deepseek_api_base_url") or defaults.get("deepseek_api_base_url", "")))
         model_val = str(cfg.get("model_name") or defaults.get("model_name", ""))
         if model_val and model_val not in [self.model_name_combo.itemText(i) for i in range(self.model_name_combo.count())]:
             self.model_name_combo.addItem(model_val)
@@ -548,15 +510,8 @@ class SettingsTabQt(QtWidgets.QWidget):
         top_p_val = float(cfg.get("top_p", defaults.get("top_p", 0.9)))
         self.top_p_slider.setValue(int(top_p_val * 100))
 
-        thinking_budget = cfg.get("thinking_budget")
-        if thinking_budget is not None:
-            try:
-                self.thinking_budget_slider.setValue(int(thinking_budget))
-            except Exception:
-                self.thinking_budget_slider.setValue(-1)
-        else:
-            self.thinking_budget_slider.setValue(-1)
-        self.thinking_level_combo.setCurrentText(str(cfg.get("thinking_level", defaults.get("thinking_level", "high"))))
+        self.reasoning_enabled_check.setChecked(bool(cfg.get("deepseek_thinking_enabled", defaults.get("deepseek_thinking_enabled", True))))
+        self.reasoning_effort_combo.setCurrentText(str(cfg.get("deepseek_reasoning_effort", defaults.get("deepseek_reasoning_effort", "high"))))
 
         chunk_size = cfg.get("chunk_size", defaults.get("chunk_size", 6000))
         if isinstance(chunk_size, int):
@@ -589,8 +544,7 @@ class SettingsTabQt(QtWidgets.QWidget):
 
         self._update_prefill_button_text()
 
-        # Vertex/모델 상태 조정
-        self._on_vertex_toggle(self.use_vertex_check.checkState())
+        # 모델 상태 조정
         self._on_model_changed(self.model_name_combo.currentText())
 
         self.use_content_safety_check.setChecked(bool(cfg.get("use_content_safety_retry", defaults.get("use_content_safety_retry", True))))
@@ -611,15 +565,12 @@ class SettingsTabQt(QtWidgets.QWidget):
         api_keys = [line.strip() for line in self.api_keys_edit.toPlainText().splitlines() if line.strip()]
         if api_keys:
             cfg["api_keys"] = api_keys
-        cfg["use_vertex_ai"] = self.use_vertex_check.isChecked()
-        cfg["service_account_file_path"] = self.sa_path_edit.text().strip() or None
-        cfg["gcp_project"] = self.gcp_project_edit.text().strip() or None
-        cfg["gcp_location"] = self.gcp_location_edit.text().strip() or None
+        cfg["deepseek_api_base_url"] = self.api_base_url_edit.text().strip() or "https://api.deepseek.com"
         cfg["model_name"] = self.model_name_combo.currentText().strip() or None
         cfg["temperature"] = self.temperature_slider.value() / 100.0
         cfg["top_p"] = self.top_p_slider.value() / 100.0
-        cfg["thinking_budget"] = int(self.thinking_budget_slider.value()) if self.thinking_budget_slider.isEnabled() else None
-        cfg["thinking_level"] = self.thinking_level_combo.currentText() if self.thinking_level_combo.isEnabled() else None
+        cfg["deepseek_thinking_enabled"] = self.reasoning_enabled_check.isChecked()
+        cfg["deepseek_reasoning_effort"] = self.reasoning_effort_combo.currentText()
         cfg["chunk_size"] = int(self.chunk_size_spin.value())
         cfg["max_workers"] = int(self.max_workers_spin.value())
         cfg["requests_per_minute"] = float(self.rpm_spin.value())
@@ -888,53 +839,10 @@ class SettingsTabQt(QtWidgets.QWidget):
         dlg.setDetailedText("\n".join(detailed_info))
         dlg.exec()
 
-    @QtCore.Slot(int)
-    def _on_vertex_toggle(self, state: int) -> None:
-        enabled = state == QtCore.Qt.Checked
-        self.sa_path_edit.setEnabled(enabled)
-        self.gcp_project_edit.setEnabled(enabled)
-        self.gcp_location_edit.setEnabled(enabled)
-        # Vertex 사용 시 API 키 입력 비활성화, 미사용 시 활성화
-        self.api_keys_edit.setEnabled(not enabled)
-        if enabled and not self.sa_path_edit.text().strip():
-            QtWidgets.QMessageBox.information(
-                self,
-                "서비스 계정 필요",
-                "Vertex AI를 사용하려면 서비스 계정 JSON 경로를 지정하세요.",
-            )
-
     @QtCore.Slot(str)
     def _on_model_changed(self, model_name: str) -> None:
-        name = (model_name or "").lower()
-
-        # 현재 선택 값을 보존하여 목록 재구성 후 다시 적용
-        current_level = self.thinking_level_combo.currentText()
-
-        # Gemini 3: Thinking Level on, Budget off
-        if "gemini-3" in name:
-            self.thinking_level_combo.setEnabled(True)
-            values = ["minimal", "low", "medium", "high"] if "flash" in name else ["low", "high"]
-            self.thinking_level_combo.blockSignals(True)
-            self.thinking_level_combo.clear()
-            self.thinking_level_combo.addItems(values)
-            # keep current if valid else default high
-            if current_level in values:
-                self.thinking_level_combo.setCurrentText(current_level)
-            else:
-                self.thinking_level_combo.setCurrentText("high")
-            self.thinking_level_combo.blockSignals(False)
-
-            self.thinking_budget_slider.setEnabled(False)
-
-        # Gemini 2.5: Budget on, Level off
-        elif "gemini-2.5" in name:
-            self.thinking_level_combo.setEnabled(False)
-            self.thinking_budget_slider.setEnabled(True)
-
-        # Other models: Budget on, Level off (fallback)
-        else:
-            self.thinking_level_combo.setEnabled(False)
-            self.thinking_budget_slider.setEnabled(True)
+        del model_name
+        self.reasoning_effort_combo.setEnabled(self.reasoning_enabled_check.isChecked())
 
     @asyncSlot()
     async def _refresh_model_list(self, force: bool = False) -> None:

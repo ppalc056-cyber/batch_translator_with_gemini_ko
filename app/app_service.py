@@ -28,7 +28,8 @@ try:
         save_merged_chunks_to_file
     )
     from ..core.config.config_manager import ConfigManager
-    from infrastructure.gemini_client import GeminiClient, GeminiAllApiKeysExhaustedException, GeminiInvalidRequestException
+    from infrastructure.deepseek_client import DeepSeekClient as GeminiClient
+    from infrastructure.gemini_client import GeminiAllApiKeysExhaustedException, GeminiInvalidRequestException
     from domain.translation_service import TranslationService
     from domain.glossary_service import SimpleGlossaryService
     from ..utils.chunk_service import ChunkService
@@ -48,7 +49,8 @@ except ImportError:
         save_merged_chunks_to_file
     )
     from core.config.config_manager import ConfigManager
-    from infrastructure.gemini_client import GeminiClient, GeminiAllApiKeysExhaustedException, GeminiInvalidRequestException
+    from infrastructure.deepseek_client import DeepSeekClient as GeminiClient
+    from infrastructure.gemini_client import GeminiAllApiKeysExhaustedException, GeminiInvalidRequestException
     from domain.translation_service import TranslationService
     from domain.glossary_service import SimpleGlossaryService
     from utils.chunk_service import ChunkService
@@ -109,105 +111,35 @@ class AppService:
                 logger.info(f"런타임 오버라이드 적용: {list(runtime_overrides.keys())}")
             logger.info("애플리케이션 설정 로드 완료.")
 
-            auth_credentials_for_gemini_client: Optional[Union[str, List[str], Dict[str, Any]]] = None
-            use_vertex = self.config.get("use_vertex_ai", False)
-            gcp_project_from_config = self.config.get("gcp_project")
-            gcp_location = self.config.get("gcp_location")
-            sa_file_path_str = self.config.get("service_account_file_path")
+            auth_credentials_for_gemini_client: Optional[Union[str, List[str]]] = None
+            api_keys_list_val = self.config.get("api_keys", [])
+            if isinstance(api_keys_list_val, list):
+                valid_api_keys = [key for key in api_keys_list_val if isinstance(key, str) and key.strip()]
+                if valid_api_keys:
+                    auth_credentials_for_gemini_client = valid_api_keys
+                    logger.info(f"DeepSeek API 키 {len(valid_api_keys)}개 로드됨(첫 번째 키 사용)")
 
-            # 설정 요약 로깅 (조건부)
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"설정 요약: vertex={use_vertex}, project={gcp_project_from_config}, location={gcp_location}")
+            if auth_credentials_for_gemini_client is None:
+                api_key_val = self.config.get("api_key")
+                if isinstance(api_key_val, str) and api_key_val.strip():
+                    auth_credentials_for_gemini_client = api_key_val
+                    logger.info("단일 DeepSeek API 키 사용")
 
-            if use_vertex:
-                logger.info("Vertex AI 사용 모드로 설정되었습니다.")
-                # Vertex AI 모드에서는 auth_credentials_for_gemini_client가 SA JSON 문자열, SA Dict, 또는 None (ADC용)이 될 수 있습니다.
-                if sa_file_path_str:
-                    sa_file_path = Path(sa_file_path_str)
-                    if sa_file_path.is_file():
-                        try:
-                            auth_credentials_for_gemini_client = read_text_file(sa_file_path)
-                            logger.info(f"Vertex AI SA 파일에서 인증 정보 로드됨: {sa_file_path.name}")
-                        except Exception as e:
-                            logger.error(f"Vertex AI SA 파일 읽기 실패: {e}")
-                            auth_credentials_for_gemini_client = None
-                    else:
-                        logger.warning(f"Vertex AI SA 파일 경로 무효: {sa_file_path_str}")
-                        auth_conf_val = self.config.get("auth_credentials")
-                        if isinstance(auth_conf_val, (str, dict)) and auth_conf_val:
-                            auth_credentials_for_gemini_client = auth_conf_val
-                            logger.info("auth_credentials 값을 대체 사용")
-                        else:
-                            auth_credentials_for_gemini_client = None
-                            logger.info("ADC 사용 예정")
-                elif self.config.get("auth_credentials"):
-                    auth_conf_val = self.config.get("auth_credentials")
-                    if isinstance(auth_conf_val, (str, dict)) and auth_conf_val:
-                        auth_credentials_for_gemini_client = auth_conf_val
-                        logger.info("Vertex AI: auth_credentials 값 사용")
-                    else:
-                        auth_credentials_for_gemini_client = None
-                        logger.info("Vertex AI: ADC 사용 예정")
-                else:
-                    auth_credentials_for_gemini_client = None
-                    logger.info("Vertex AI: ADC 사용")
-            else:
-                logger.info("Gemini Developer API 모드")
-                auth_credentials_for_gemini_client = None
+            if auth_credentials_for_gemini_client is None:
+                logger.warning("DeepSeek API 키가 설정되지 않음")
 
-                api_keys_list_val = self.config.get("api_keys", [])
-                if isinstance(api_keys_list_val, list):
-                    valid_api_keys = [key for key in api_keys_list_val if isinstance(key, str) and key.strip()]
-                    if valid_api_keys:
-                        auth_credentials_for_gemini_client = valid_api_keys
-                        logger.info(f"API 키 {len(valid_api_keys)}개 사용")
-                
-                if auth_credentials_for_gemini_client is None:
-                    api_key_val = self.config.get("api_key")
-                    if isinstance(api_key_val, str) and api_key_val.strip():
-                        auth_credentials_for_gemini_client = api_key_val
-                        logger.info("단일 API 키 사용")
-
-                if auth_credentials_for_gemini_client is None:
-                    auth_credentials_conf_val = self.config.get("auth_credentials")
-                    if isinstance(auth_credentials_conf_val, str) and auth_credentials_conf_val.strip():
-                        auth_credentials_for_gemini_client = auth_credentials_conf_val
-                        logger.info("auth_credentials 문자열 사용")
-                    elif isinstance(auth_credentials_conf_val, list):
-                        valid_keys_from_auth_cred = [k for k in auth_credentials_conf_val if isinstance(k, str) and k.strip()]
-                        if valid_keys_from_auth_cred:
-                            auth_credentials_for_gemini_client = valid_keys_from_auth_cred
-                            logger.info(f"auth_credentials에서 API 키 {len(valid_keys_from_auth_cred)}개 사용")
-                    elif isinstance(auth_credentials_conf_val, dict):
-                        auth_credentials_for_gemini_client = auth_credentials_conf_val
-                        logger.info("auth_credentials SA dict 사용")
-
-                if auth_credentials_for_gemini_client is None:
-                    logger.warning("API 키가 설정되지 않음")
-
-            should_initialize_client = False
-            if auth_credentials_for_gemini_client:
-                if isinstance(auth_credentials_for_gemini_client, str) and auth_credentials_for_gemini_client.strip():
-                    should_initialize_client = True
-                elif isinstance(auth_credentials_for_gemini_client, list) and auth_credentials_for_gemini_client:
-                    should_initialize_client = True
-                elif isinstance(auth_credentials_for_gemini_client, dict):
-                    should_initialize_client = True
-            elif use_vertex and not auth_credentials_for_gemini_client and \
-                 (gcp_project_from_config or os.environ.get("GOOGLE_CLOUD_PROJECT")):
-                should_initialize_client = True
-                logger.info("Vertex AI ADC 모드로 클라이언트 초기화 예정")
+            should_initialize_client = bool(auth_credentials_for_gemini_client)
 
             if should_initialize_client:
                 try:
-                    project_to_pass_to_client = gcp_project_from_config if gcp_project_from_config and gcp_project_from_config.strip() else None
                     rpm_value = self.config.get("requests_per_minute")
                     api_timeout_value = self.config.get("api_timeout", 500.0)
-                    logger.info(f"GeminiClient 초기화: project={project_to_pass_to_client}, RPM={rpm_value}, Timeout={api_timeout_value}s")
+                    api_base_url = self.config.get("deepseek_api_base_url", "https://api.deepseek.com")
+                    logger.info(f"DeepSeekClient 초기화: base_url={api_base_url}, RPM={rpm_value}, Timeout={api_timeout_value}s")
                     self.gemini_client = GeminiClient(
                         auth_credentials=auth_credentials_for_gemini_client,
-                        project=project_to_pass_to_client,
-                        location=gcp_location,
+                        base_url=api_base_url,
+                        available_models=self.config.get("deepseek_model_candidates"),
                         requests_per_minute=rpm_value,
                         api_timeout=api_timeout_value
                     )
@@ -218,7 +150,7 @@ class AppService:
                     logger.error(f"GeminiClient 초기화 오류: {e_client}", exc_info=True)
                     self.gemini_client = None
             else:
-                logger.warning("API 키 또는 Vertex AI 설정이 충분하지 않아 Gemini 클라이언트 초기화를 시도하지 않습니다.")
+                logger.warning("API 키 설정이 충분하지 않아 DeepSeek 클라이언트 초기화를 시도하지 않습니다.")
                 self.gemini_client = None
 
             if self.gemini_client:
@@ -260,8 +192,8 @@ class AppService:
 
     async def get_available_models(self) -> List[Dict[str, Any]]:
         if not self.gemini_client:
-            logger.error("모델 목록 조회 실패: Gemini 클라이언트가 초기화되지 않았습니다.")
-            raise BtgServiceException("Gemini 클라이언트가 초기화되지 않았습니다. API 키 또는 Vertex AI 설정을 확인하세요.")
+            logger.error("모델 목록 조회 실패: DeepSeek 클라이언트가 초기화되지 않았습니다.")
+            raise BtgServiceException("DeepSeek 클라이언트가 초기화되지 않았습니다. API 키/URL 설정을 확인하세요.")
         logger.info("사용 가능한 모델 목록 조회 서비스 호출됨.")
         try:
             all_models = await self.gemini_client.list_models_async()
