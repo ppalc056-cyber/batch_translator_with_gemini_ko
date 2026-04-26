@@ -41,13 +41,12 @@ class ConfigManager:
             Dict[str, Any]: 기본 설정 딕셔너리.
         """
         return {
-            "api_key": "",  
-            "api_keys": [], 
-            "service_account_file_path": None,
-            "use_vertex_ai": False,
-            "gcp_project": None,
-            "gcp_location": None,
-            "auth_credentials": "", 
+            "api_key": "",
+            "api_keys": [],
+            "deepseek_api_base_url": "https://api.deepseek.com/chat/completions",
+            "deepseek_model_candidates": ["deepseek-v4-flash", "deepseek-v4-pro"],
+            "deepseek_thinking_enabled": True,
+            "deepseek_reasoning_effort": "high",
             # 프리필 번역 설정
             "enable_prefill_translation": True,  # 기본값을 False로 변경하여 토큰 사용량 최적화
             "prefill_system_instruction": (
@@ -98,10 +97,10 @@ class ConfigManager:
             "requests_per_minute": 2.0, # 분당 요청 수 제한 (0 또는 None이면 제한 없음)
             "novel_language": "auto", # 로어북 추출 및 번역 출발 언어 (자동 감지)
             "novel_language_fallback": "zh", # 자동 감지 실패 시 사용할 폴백 언어
-            "model_name": "gemini-2.0-flash",
+            "model_name": "deepseek-v4-flash",
             "temperature": 0.7,
-            "thinking_budget": None, # thinking_budget 기본값 (None이면 모델 기본값 사용 또는 자동)
-            "thinking_level": "high",  # [추가] Thinking Level 기본값 (low, medium, high, minimal)
+            "thinking_budget": None,
+            "thinking_level": "high",
             "top_p": 0.9, # type: ignore
             "prompts": ( # type: ignore
                 "# 용어집 컨텍스트 (제공된 경우 아래 용어집에 명시된 번역어를 반드시 준수하세요.)\n"

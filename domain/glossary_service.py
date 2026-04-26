@@ -303,12 +303,12 @@ class SimpleGlossaryService:
             logger.info("용어집 추출이 중단되었습니다 (작업 시작 전)")
             raise asyncio.CancelledError("용어집 추출 중단 요청됨")
         
-        model_name = self.config.get("model_name", "gemini-2.0-flash")
+        model_name = self.config.get("model_name", "deepseek-v4-flash")
         generation_config_params = { 
             "temperature": self.config.get("glossary_extraction_temperature", 0.3),
             "response_mime_type": "application/json",
-            "response_schema": list[ApiGlossaryTerm],
-            "thinking_level": self.config.get("thinking_level", "high")
+            "deepseek_thinking_enabled": self.config.get("deepseek_thinking_enabled", True),
+            "deepseek_reasoning_effort": self.config.get("deepseek_reasoning_effort", "high"),
         }
 
         api_prompt_for_gemini_client: Union[str, List[genai_types.Content]]
@@ -570,4 +570,3 @@ class SimpleGlossaryService:
         self.save_glossary_to_json(final_glossary, output_path)
         
         return output_path
-

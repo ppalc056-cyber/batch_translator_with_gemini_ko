@@ -455,11 +455,12 @@ class TranslationService:
         try:
             translated_text_from_api = await self.gemini_client.generate_text_async(
                 prompt=api_prompt_for_gemini_client,
-                model_name=self.config.get("model_name", "gemini-2.0-flash"),
+                model_name=self.config.get("model_name", "deepseek-v4-flash"),
                 generation_config_dict={
                     "temperature": self.config.get("temperature", 0.7),
                     "top_p": self.config.get("top_p", 0.9),
-                    "thinking_level": self.config.get("thinking_level", "high")
+                    "deepseek_thinking_enabled": self.config.get("deepseek_thinking_enabled", True),
+                    "deepseek_reasoning_effort": self.config.get("deepseek_reasoning_effort", "high"),
                 },
                 thinking_budget=self.config.get("thinking_budget", None),
                 system_instruction_text=api_system_instruction,
@@ -626,4 +627,3 @@ class TranslationService:
         logger.info(f"   📊 병렬 처리 완료: {len(results)}/{len(sub_chunks)}개 서브 청크 처리됨")
         
         return "\n\n".join(translated_parts)
-
