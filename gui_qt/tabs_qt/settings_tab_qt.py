@@ -184,8 +184,8 @@ class SettingsTabQt(QtWidgets.QWidget):
         self.api_keys_edit.setPlaceholderText("API 키를 줄바꿈으로 구분하여 입력")
         TooltipQt(self.api_keys_edit, "DeepSeek API 키를 줄바꿈으로 구분하여 입력합니다.\n여러 키를 입력해도 현재는 첫 번째 키를 사용합니다.")
         self.api_base_url_edit = QtWidgets.QLineEdit()
-        self.api_base_url_edit.setPlaceholderText("https://api.deepseek.com/chat/completions")
-        TooltipQt(self.api_base_url_edit, "DeepSeek Chat Completions URL을 입력합니다.")
+        self.api_base_url_edit.setPlaceholderText("https://api.deepseek.com")
+        TooltipQt(self.api_base_url_edit, "DeepSeek API URL을 입력합니다.\n루트 URL(https://api.deepseek.com) 또는 /chat/completions까지 포함한 URL 모두 허용됩니다.")
 
         # 모델 콤보 (editable) - 기본 후보 + 사용자 입력 유지
         self.model_name_combo = NoWheelComboBox()
@@ -565,7 +565,7 @@ class SettingsTabQt(QtWidgets.QWidget):
         api_keys = [line.strip() for line in self.api_keys_edit.toPlainText().splitlines() if line.strip()]
         if api_keys:
             cfg["api_keys"] = api_keys
-        cfg["deepseek_api_base_url"] = self.api_base_url_edit.text().strip() or "https://api.deepseek.com/chat/completions"
+        cfg["deepseek_api_base_url"] = self.api_base_url_edit.text().strip() or "https://api.deepseek.com"
         cfg["model_name"] = self.model_name_combo.currentText().strip() or None
         cfg["temperature"] = self.temperature_slider.value() / 100.0
         cfg["top_p"] = self.top_p_slider.value() / 100.0

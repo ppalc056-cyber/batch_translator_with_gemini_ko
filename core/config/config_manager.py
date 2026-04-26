@@ -43,7 +43,7 @@ class ConfigManager:
         return {
             "api_key": "",
             "api_keys": [],
-            "deepseek_api_base_url": "https://api.deepseek.com/chat/completions",
+            "deepseek_api_base_url": "https://api.deepseek.com",
             "deepseek_model_candidates": ["deepseek-v4-flash", "deepseek-v4-pro"],
             "deepseek_thinking_enabled": True,
             "deepseek_reasoning_effort": "high",

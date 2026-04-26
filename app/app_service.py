@@ -134,7 +134,7 @@ class AppService:
                 try:
                     rpm_value = self.config.get("requests_per_minute")
                     api_timeout_value = self.config.get("api_timeout", 500.0)
-                    api_base_url = self.config.get("deepseek_api_base_url", "https://api.deepseek.com/chat/completions")
+                    api_base_url = self.config.get("deepseek_api_base_url", "https://api.deepseek.com")
                     logger.info(f"DeepSeekClient 초기화: base_url={api_base_url}, RPM={rpm_value}, Timeout={api_timeout_value}s")
                     self.gemini_client = GeminiClient(
                         auth_credentials=auth_credentials_for_gemini_client,

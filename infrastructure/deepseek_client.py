@@ -31,7 +31,7 @@ class DeepSeekClient:
     def __init__(
         self,
         auth_credentials: Optional[Union[str, List[str]]] = None,
-        base_url: str = "https://api.deepseek.com/chat/completions",
+        base_url: str = "https://api.deepseek.com",
         available_models: Optional[List[str]] = None,
         requests_per_minute: Optional[float] = None,
         api_timeout: float = 500.0,
@@ -47,7 +47,7 @@ class DeepSeekClient:
             raise GeminiInvalidRequestException("DeepSeek API 키가 제공되지 않았습니다.")
 
         timeout_sec = max(1, int(api_timeout))
-        self.base_url = base_url.strip() or "https://api.deepseek.com/chat/completions"
+        self.base_url = self._normalize_base_url(base_url)
         self.available_models = available_models or ["deepseek-v4-flash", "deepseek-v4-pro"]
         self.client = OpenAICompatibleClient(
             api_key=api_key,
@@ -55,6 +55,18 @@ class DeepSeekClient:
             requests_per_minute=requests_per_minute,
             request_timeout=timeout_sec,
         )
+
+    @staticmethod
+    def _normalize_base_url(raw_url: Optional[str]) -> str:
+        url = (raw_url or "").strip().rstrip("/")
+        if not url:
+            return "https://api.deepseek.com/chat/completions"
+
+        if url.endswith("/chat/completions") or url.endswith("/v1/chat/completions"):
+            return url
+        if url.endswith("/v1"):
+            return f"{url}/chat/completions"
+        return f"{url}/chat/completions"
 
     @staticmethod
     def _normalize_reasoning_effort(raw: Optional[str]) -> str:
